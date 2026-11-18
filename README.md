@@ -1,66 +1,69 @@
 # 30458 ID — Central Sign-in Portal
 
-The Team 30458 identity portal. It uses Auth0 (or another OIDC provider) for authentication and maintains its own server-side application session.
+The Team 30458 central identity portal. Auth0 verifies the member's credentials; this service then issues a short-lived, one-time authorization code to the FTC documentation site. The documentation site exchanges that code for a Firebase custom token and signs into Firebase Authentication. Firestore remains the documentation database.
 
-## Current implementation
+## Sign-in architecture
 
-- Node.js 20+, Express, HTML/CSS/JavaScript.
-- OpenID Connect Authorization Code flow with PKCE, state and nonce validation.
-- `/` is the sign-in landing page when logged out and redirects signed-in users to `/dashboard`.
-- `/dashboard` requires an authenticated session.
-- `/auth/login` and `/auth/callback` handle OIDC sign-in; `POST /auth/logout` ends the local portal session.
-- `/api/me` returns the signed-in user's basic profile.
-- Optional Firestore profile metadata; it is disabled by default.
+1. The member opens `https://log.ftc30458.com` and selects **Continue to 30458 ID**.
+2. The browser redirects to `https://auth.ftc30458.com`.
+3. Auth0 authenticates the member and returns them to this portal.
+4. This portal requires a verified email and matches it against an active document in the documentation project's `users` collection.
+5. The matching Firestore document ID is used as the Firebase UID. This preserves the existing UID and its Firestore ownership rules.
+6. A 90-second, single-use authorization code protected by PKCE is sent to the documentation callback. The documentation site exchanges it server-to-server with this portal and signs in using Firebase `signInWithCustomToken`.
 
-This app is an **OIDC relying party/client**, not an identity provider or OAuth authorization server. Auth0 verifies credentials. Do not store passwords or provider tokens in Firestore.
+The browser never receives the Auth0 client secret or Firebase service-account credentials. Firebase custom tokens are returned only after an approved roster match. Never add a public sign-up route to this service.
 
-## Auth0 setup
+## Required environment
 
-Create an Auth0 **Regular Web Application**. In its Settings, configure these exact local URLs:
+Set these values in the central portal's hosting environment:
 
-- Allowed Callback URLs: `http://localhost:3000/auth/callback`
-- Allowed Logout URLs: `http://localhost:3000`
-- Allowed Web Origins: `http://localhost:3000`
+- `APP_BASE_URL=https://auth.ftc30458.com`
+- `OIDC_REDIRECT_URI=https://auth.ftc30458.com/auth/callback`
+- `FIRESTORE_ENABLED=true`
+- `FIRESTORE_PROJECT_ID=ftcdocumentation-53b62`
+- `FIRESTORE_TEAM_USERS_COLLECTION=users`
+- `DOCS_OAUTH_CLIENT_ID=ftc30458-documentation`
+- `DOCS_ORIGIN=https://log.ftc30458.com`
+- `DOCS_REDIRECT_URI=https://log.ftc30458.com/auth-callback.html`
+- A random `SESSION_SECRET` of at least 32 characters.
+- Auth0 issuer, client ID, client secret, and scope `openid profile email`.
 
-Use the Auth0 tenant domain shown in the dashboard as the issuer, with a trailing slash, for example `https://YOUR_TENANT.us.auth0.com/`.
+The portal needs Google Application Default Credentials for the same Firebase project. Locally, set `GOOGLE_APPLICATION_CREDENTIALS` to a service-account JSON file stored outside this repository. In production, attach a service account to the hosting runtime with permission to read the `users` roster, write the portal's Firestore collections, and mint Firebase custom tokens. Never commit or paste the JSON key.
 
-## Local setup
+Firestore collections used by this portal:
+- `identityProfiles`: central portal profile metadata.
+- `identitySessions`: persistent Express sessions in production.
+- `identityOAuthCodes`: hashed, short-lived, one-time authorization-code records.
 
-1. Install Node.js 20 or newer.
-2. Clone this repository.
-3. Run `npm install`.
-4. Copy `.env.example` to `.env`.
-5. Fill in `OIDC_ISSUER`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET` from the Auth0 application's Basic Information.
-6. Generate a separate random `SESSION_SECRET` with at least 32 characters. Do not use the Auth0 Client Secret as the session secret.
-7. Run `npm run dev` and open `http://localhost:3000`.
+## Auth0 application settings
 
-Never commit `.env`, expose the Client Secret in browser JavaScript, or paste it into chats/issues.
+For the Auth0 Regular Web Application, configure:
 
-## Domain plan
-
-The portal itself is intended to live at **`auth.ftc30458.com`**. Its pages and routes stay on that one hostname. The Auth0 tenant domain is currently the OIDC issuer and may appear briefly during the hosted sign-in redirect. A custom Auth0 login domain is a separate DNS/routing decision; do not point `auth.ftc30458.com` at Auth0 while also expecting it to serve this Express portal unless a supported proxy/routing design has been configured.
-
-When deploying the portal, update the Auth0 URLs to the production origin:
 - Allowed Callback URLs: `https://auth.ftc30458.com/auth/callback`
 - Allowed Logout URLs: `https://auth.ftc30458.com`
 - Allowed Web Origins: `https://auth.ftc30458.com`
 
-Set `APP_BASE_URL=https://auth.ftc30458.com` and `OIDC_REDIRECT_URI=https://auth.ftc30458.com/auth/callback` in the hosting provider's environment settings. Keep the local URLs too if local development will continue.
+Keep local callback URLs only if local portal testing is needed.
 
-## Sessions and production readiness
+## Local development
 
-The current Express MemoryStore is **development-only**. The server intentionally refuses to start with `NODE_ENV=production` until a persistent `express-session` store is implemented and configured. Do not remove this guard or enable MemoryStore in production. Before public deployment, add a maintained persistent store (for example Redis), HTTPS, secure cookies, secret-managed environment variables, monitoring, and operational backups.
+1. Use Node.js 20 or newer.
+2. Run `npm install`.
+3. Copy `.env.example` to `.env`.
+4. Set Auth0 credentials, a random session secret, Firestore project ID, and local Google Application Default Credentials.
+5. Set `APP_BASE_URL` and the Auth0 callback URI to your local origin for local Auth0 testing. For the live documentation integration, the docs callback and origin must remain the exact production URLs above.
+6. Run `npm run dev`.
 
-Authentication is not authorization. A successful login must not automatically grant every team member access to every team tool. Add explicit team membership, roles, permissions, account provisioning, and audit logging before connecting real team data.
+Production uses a Firestore-backed Express session store. Development uses the in-memory session store. Authorization codes are stored in Firestore and are single-use.
 
-## SSO across team applications
+## Important security behavior
 
-Register Logging, Training, and future applications as separate OIDC clients with the same Auth0 tenant. Each app needs its own callback URL and its own session. Auth0's shared login session can provide SSO; do not copy cookies or tokens between applications. Do not migrate the existing Logging app's Firebase Authentication until the new flow has been tested and a deliberate account-migration plan is ready.
+- A user must have `email_verified: true` from Auth0.
+- Their email must match exactly (case-insensitive) one active document in `users`.
+- The Firestore document ID is used as the Firebase UID, so existing document ownership remains intact.
+- Redirect URI and browser Origin are exact allowlists.
+- The authorization flow uses PKCE S256, state, 90-second codes, and one-time atomic redemption.
+- Firestore Admin SDK operations bypass Firestore Security Rules. The server therefore performs the team membership check before minting any Firebase token.
+- Signing out of the documentation app signs out its Firebase session. The Auth0 browser session may remain active, allowing SSO on the next sign-in.
 
-## Optional Firestore
-
-Set `FIRESTORE_ENABLED=true`, configure `FIRESTORE_PROJECT_ID`, and provide Google Application Default Credentials to the server runtime. The server writes basic profile metadata keyed by a SHA-256 hash of issuer and subject. Never place service-account credentials in `public/` or browser code. Firestore Admin SDK bypasses Firestore Security Rules, so backend endpoints must enforce authorization themselves.
-
-## Security notes
-
-The implementation uses PKCE S256, state and nonce validation, exact redirect URI matching, an HttpOnly/SameSite session cookie, Helmet security headers, rate limiting, and a local-path-only post-login redirect. The portal is an early development starter, not a production-ready identity platform.
+Do not expose the Firebase Admin service account, Auth0 client secret, session secret, or custom tokens in source control or browser logs.
