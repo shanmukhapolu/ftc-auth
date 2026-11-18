@@ -2,15 +2,47 @@ import { Firestore } from "@google-cloud/firestore";
 
 let db;
 
-function getFirestore() {
+export function getFirestoreClient() {
   if (process.env.FIRESTORE_ENABLED !== "true") return null;
-  if (!db) db = new Firestore({ projectId: process.env.FIRESTORE_PROJECT_ID || undefined });
+  if (!db) {
+    db = new Firestore({
+      projectId: process.env.FIRESTORE_PROJECT_ID || undefined
+    });
+  }
   return db;
+}
+
+/** Look up an existing team account by verified email. The Firestore document ID
+ * becomes the Firebase UID, preserving the documentation app's existing identity. */
+export async function findTeamMemberByEmail(email) {
+  const firestore = getFirestoreClient();
+  if (!firestore) {
+    const error = new Error("Firestore is required for team account verification.");
+    error.code = "FIRESTORE_DISABLED";
+    throw error;
+  }
+
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedEmail) return null;
+
+  const collection = process.env.FIRESTORE_TEAM_USERS_COLLECTION || "users";
+  const snapshot = await firestore.collection(collection)
+    .where("email", "==", normalizedEmail)
+    .limit(2)
+    .get();
+
+  if (snapshot.empty) return null;
+  if (snapshot.size > 1) {
+    throw new Error("More than one team profile uses this email address. Resolve the duplicate before sign-in.");
+  }
+
+  const member = snapshot.docs[0];
+  return { uid: member.id, ...member.data() };
 }
 
 /** Stores profile metadata only. Never store passwords or provider tokens here. */
 export async function saveIdentityProfile(uid, identity) {
-  const firestore = getFirestore();
+  const firestore = getFirestoreClient();
   if (!firestore) return;
 
   const collection = process.env.FIRESTORE_USERS_COLLECTION || "identityProfiles";
@@ -29,7 +61,7 @@ export async function saveIdentityProfile(uid, identity) {
 }
 
 export async function getEditableProfile(uid, identity) {
-  const firestore = getFirestore();
+  const firestore = getFirestoreClient();
   const fallback = {
     displayName: identity.name || identity.preferred_username || identity.email || "30458 member",
     bio: ""
@@ -47,7 +79,7 @@ export async function getEditableProfile(uid, identity) {
 }
 
 export async function updateEditableProfile(uid, updates) {
-  const firestore = getFirestore();
+  const firestore = getFirestoreClient();
   if (!firestore) {
     const error = new Error("Profile storage is not enabled.");
     error.code = "PROFILE_STORAGE_DISABLED";
