@@ -26,17 +26,19 @@ export async function findTeamMemberByEmail(email) {
   if (!normalizedEmail) return null;
 
   const collection = process.env.FIRESTORE_TEAM_USERS_COLLECTION || "users";
-  const snapshot = await firestore.collection(collection)
-    .where("email", "==", normalizedEmail)
-    .limit(2)
-    .get();
+  // The team roster is small. A normalized comparison avoids case-sensitive
+  // email mismatches in older profile documents.
+  const snapshot = await firestore.collection(collection).get();
+  const matches = snapshot.docs.filter(document =>
+    String(document.data().email || "").trim().toLowerCase() === normalizedEmail
+  );
 
-  if (snapshot.empty) return null;
-  if (snapshot.size > 1) {
+  if (matches.length === 0) return null;
+  if (matches.length > 1) {
     throw new Error("More than one team profile uses this email address. Resolve the duplicate before sign-in.");
   }
 
-  const member = snapshot.docs[0];
+  const member = matches[0];
   return { uid: member.id, ...member.data() };
 }
 
