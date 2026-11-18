@@ -226,8 +226,14 @@ app.use(express.static(path.join(__dirname, "public"), {
 }));
 
 app.use((error, _req, res, _next) => {
-  console.error("Request failed:", error?.message || "Unknown error");
-  res.status(500).send("Something went wrong while processing your request. Please try again.");
+  console.error("Request failed:", error);
+  if (error?.cause) {
+    console.error("Underlying cause:", error.cause);
+  }
+
+  res.status(500).send(
+    "Something went wrong while processing your request. Check server logs."
+  );
 });
 
 const port = Number(process.env.PORT || 3000);
