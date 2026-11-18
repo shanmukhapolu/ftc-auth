@@ -25,7 +25,9 @@ if (process.env.SESSION_SECRET.length < 32) {
 const app = express();
 const production = process.env.NODE_ENV === "production";
 const baseUrl = new URL(process.env.APP_BASE_URL);
-if (production) app.set("trust proxy", 1);
+// Codespaces and other reverse-proxy development environments must opt in explicitly.
+// Trust exactly one proxy hop; do not enable this when the app is directly exposed.
+if (production || process.env.TRUST_PROXY === "1") app.set("trust proxy", 1);
 app.disable("x-powered-by");
 app.use(helmet({
   contentSecurityPolicy: {
