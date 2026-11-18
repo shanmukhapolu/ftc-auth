@@ -39,7 +39,7 @@ export async function findTeamMemberByEmail(email) {
   }
 
   const member = matches[0];
-  return { uid: member.id, ...member.data() };
+  return { ...member.data(), uid: member.id };
 }
 
 /** Stores profile metadata only. Never store passwords or provider tokens here. */
