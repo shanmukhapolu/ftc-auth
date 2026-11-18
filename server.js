@@ -187,13 +187,17 @@ app.get("/auth/callback", limiter, async (req, res, next) => {
     // Rotate the session identifier after successful authentication.
     req.session.regenerate(async (error) => {
       if (error) return next(error);
-      req.session.user = { ...identity, uid };
-      await saveIdentityProfile(uid, identity);
-      const destination = safeReturnPath(transaction.returnTo);
-      req.session.save((saveError) => {
-        if (saveError) return next(saveError);
-        res.redirect(destination === "/" ? "/dashboard" : destination);
-      });
+      try {
+        req.session.user = { ...identity, uid };
+        await saveIdentityProfile(uid, identity);
+        const destination = safeReturnPath(transaction.returnTo);
+        req.session.save((saveError) => {
+          if (saveError) return next(saveError);
+          res.redirect(destination === "/" ? "/dashboard" : destination);
+        });
+      } catch (saveError) {
+        next(saveError);
+      }
     });
   } catch (error) {
     next(error);
