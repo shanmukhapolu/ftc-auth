@@ -252,6 +252,9 @@ app.get("/auth/callback", limiter, async (req, res, next) => {
 /** OAuth authorization endpoint used only by the FTC documentation site. */
 app.get("/oauth/authorize", oauthLimiter, async (req, res, next) => {
   try {
+    if (!firestore) {
+      return res.status(503).send("Documentation sign-in is not configured yet. Enable Firestore on the central portal.");
+    }
     const { client_id: clientId, redirect_uri: redirectUri, state, code_challenge: challenge, code_challenge_method: method } = req.query;
     if (
       clientId !== docsClientId ||
@@ -326,6 +329,7 @@ app.options("/oauth/token", (req, res) => {
 app.post("/oauth/token", oauthLimiter, async (req, res, next) => {
   try {
     if (!tokenCors(req, res)) return res.status(403).json({ error: "Origin not allowed." });
+    if (!firestore) return res.status(503).json({ error: "Documentation sign-in is not configured yet." });
     const { code, code_verifier: verifier, client_id: clientId, redirect_uri: redirectUri } = req.body || {};
     if (
       clientId !== docsClientId ||
