@@ -110,9 +110,7 @@ function publicUser(user) {
 }
 
 function requireSignIn(req, res, next) {
-  if (!req.session.user) {
-    return res.redirect(`/auth/login?returnTo=${encodeURIComponent(req.originalUrl || "/dashboard")}`);
-  }
+  if (!req.session.user) return res.redirect("/");
   next();
 }
 
