@@ -5,5 +5,22 @@
 <main class="page-shell"><section class="intro"><div class="eyebrow"><span class="eyebrow-line"></span> TEAM 30458 · ACCOUNT SERVICES</div><h1>One account.<br><span>Every team tool.</span></h1><p class="intro-copy">Your central identity for Team 30458. Sign in once to access the tools, resources, and applications connected to your team account.</p><div class="app-pills"><span class="app-pill"><span class="pill-icon">L</span> Logging</span><span class="app-pill"><span class="pill-icon">T</span> Training</span><span class="app-pill muted-pill"><span class="pill-plus">＋</span> More to come</span></div></section>
 <section class="auth-card" aria-labelledby="card-title"><div class="card-topline"><div class="card-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3.5 19 6v5.3c0 4.4-2.8 7.5-7 9.2-4.2-1.7-7-4.8-7-9.2V6l7-2.5Z" stroke="currentColor" stroke-width="1.6"/><path d="m9 12 2 2 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="card-status"><span class="status-dot"></span> 30458 ID</span></div>
 <div id="signed-out-view"><h2 id="card-title">Welcome back.</h2><p class="card-description">Continue with your Team 30458 account.</p><a class="primary-button" href="/auth/login"><span>Continue to sign in</span><svg viewBox="0 0 20 20" fill="none"><path d="M4 10h12m-5-5 5 5-5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></a><div class="divider"><span></span><small>YOUR TEAM ACCOUNT</small><span></span></div><div class="feature-list"><div class="feature"><span class="feature-check">✓</span><span>One sign-in across connected team applications</span></div><div class="feature"><span class="feature-check">✓</span><span>Centralized account and access management</span></div><div class="feature"><span class="feature-check">✓</span><span>Your application data stays with each tool</span></div></div><p class="fine-print">Access is provided according to your team's application permissions.</p></div>
-<div id="signed-in-view" hidden><h2 id="welcome-title">You're signed in.</h2><p class="card-description">Your 30458 ID session is active.</p><div class="profile-row"><img id="profile-picture" alt="" hidden><div id="profile-fallback" class="profile-fallback">30</div><div class="profile-copy"><strong id="profile-name">Team member</strong><span id="profile-email"></span></div><span class="verified-mark">✓</span></div><div class="session-note"><span class="secure-dot"></span> Signed in securely</div><button class="secondary-button" id="sign-out-button" type="button">Sign out</button></div><div class="error-message" id="error-message" role="status" hidden></div></section></main>
+<div id="signed-in-view" hidden>
+<h2 id="welcome-title">Your account.</h2>
+<p class="card-description">Manage the profile details connected to your 30458 ID.</p>
+<div class="profile-row"><img id="profile-picture" alt="" hidden><div id="profile-fallback" class="profile-fallback">30</div><div class="profile-copy"><strong id="profile-name">Team member</strong><span id="profile-email"></span></div><span class="verified-mark" id="verified-mark" title="Email verification status">✓</span></div>
+<div class="account-section-title">PROFILE DETAILS <span>EDITABLE</span></div>
+<form id="profile-form" class="profile-form">
+<label for="display-name">Display name</label>
+<input id="display-name" name="displayName" type="text" maxlength="60" autocomplete="name" required>
+<label for="profile-bio">About me <span class="optional-label">OPTIONAL</span></label>
+<textarea id="profile-bio" name="bio" rows="3" maxlength="240" placeholder="A short introduction for your team profile."></textarea>
+<div class="form-meta"><span>Up to 240 characters</span><span id="bio-count">0 / 240</span></div>
+<button class="primary-button save-button" id="save-profile-button" type="submit"><span>Save changes</span><svg viewBox="0 0 20 20" fill="none"><path d="m4 10 4 4 8-8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+<p id="profile-storage-note" class="storage-note" hidden>Profile editing requires Firestore to be enabled by the portal administrator.</p>
+<p id="profile-save-status" class="save-status" role="status" aria-live="polite"></p>
+</form>
+<div class="session-note"><span class="secure-dot"></span> Signed in securely</div>
+<button class="secondary-button" id="sign-out-button" type="button">Sign out</button>
+</div><div class="error-message" id="error-message" role="status" hidden></div></section></main>
 <footer class="footer"><span>© <span id="year"></span> FIRST Tech Challenge Team 30458</span><span>▣ 30458 ID · Account services</span></footer></body></html>
