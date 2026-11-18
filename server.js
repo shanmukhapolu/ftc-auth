@@ -7,7 +7,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as oidc from "openid-client";
-import { saveIdentityProfile } from "./src/firestore.js";
+import { getEditableProfile, saveIdentityProfile, updateEditableProfile } from "./src/firestore.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const required = ["APP_BASE_URL", "SESSION_SECRET", "OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_REDIRECT_URI"];
@@ -73,6 +73,12 @@ app.use(session({
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 30,
+  standardHeaders: "draft-7",
+  legacyHeaders: false
+});
+const profileLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
   standardHeaders: "draft-7",
   legacyHeaders: false
 });
@@ -214,9 +220,50 @@ app.post("/auth/logout", (req, res, next) => {
   });
 });
 
-app.get("/api/me", (req, res) => {
-  if (!req.session.user) return res.status(401).json({ authenticated: false });
-  res.json({ authenticated: true, user: publicUser(req.session.user) });
+app.get("/api/me", async (req, res, next) => {
+  try {
+    if (!req.session.user) return res.status(401).json({ authenticated: false });
+    const profile = await getEditableProfile(req.session.user.uid, req.session.user);
+    res.json({
+      authenticated: true,
+      user: {
+        ...publicUser(req.session.user),
+        displayName: profile.displayName,
+        bio: profile.bio,
+        profileEditable: profile.editable
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/me/profile", requireSignIn, profileLimiter, async (req, res, next) => {
+  try {
+    if (!req.is("application/json")) {
+      return res.status(415).json({ error: "Send profile updates as JSON." });
+    }
+
+    const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim() : "";
+    const bio = typeof req.body?.bio === "string" ? req.body.bio.trim() : "";
+
+    if (!displayName || displayName.length > 60) {
+      return res.status(400).json({ error: "Display name must be between 1 and 60 characters." });
+    }
+    if (bio.length > 240) {
+      return res.status(400).json({ error: "Bio must be 240 characters or fewer." });
+    }
+
+    await updateEditableProfile(req.session.user.uid, { displayName, bio });
+    res.json({ ok: true, displayName, bio });
+  } catch (error) {
+    if (error?.code === "PROFILE_STORAGE_DISABLED") {
+      return res.status(503).json({
+        error: "Profile editing is not enabled yet. The administrator needs to configure Firestore."
+      });
+    }
+    next(error);
+  }
 });
 
 app.use(express.static(path.join(__dirname, "public"), {
